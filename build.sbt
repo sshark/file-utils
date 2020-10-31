@@ -17,16 +17,15 @@ copyNativeImageConfigs := ((baseDirectory, target) map { (base, trg) =>
       .listFiles()
       .foreach(
         file =>
-          Files.copy(
-            file.toPath,
-            new File(trg, s"native-image/META-INF/native-image/${file.getName}").toPath,
-            StandardCopyOption.REPLACE_EXISTING)
+          Files.copy(file.toPath,
+                     new File(trg, s"native-image/META-INF/native-image/${file.getName}").toPath,
+                     StandardCopyOption.REPLACE_EXISTING)
       )
   }
 }).value
 
-addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full)
-addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
+addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.11.0" cross CrossVersion.full)
+addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1")
 
 lazy val root = (project in file("."))
   .enablePlugins(GitVersioning, BuildInfoPlugin, NativeImagePlugin)
@@ -40,10 +39,10 @@ lazy val root = (project in file("."))
     buildInfoUsePackageAsPath := true,
     libraryDependencies ++= Seq(
       "io.chrisdavenport" %% "log4cats-slf4j" % "1.1.1",
-      "ch.qos.logback" % "logback-classic" % "1.3.0-alpha5",
-      "dev.profunktor" %% "console4cats" % "0.8.1",
-      "com.monovore" %% "decline-effect" % "1.3.0",
-      "com.lihaoyi" %% "os-lib" % "0.7.1"
+      "ch.qos.logback"    % "logback-classic" % "1.3.0-alpha5",
+      "dev.profunktor"    %% "console4cats"   % "0.8.1",
+      "com.monovore"      %% "decline-effect" % "1.3.0",
+      "com.lihaoyi"       %% "os-lib"         % "0.7.1"
     ),
     Compile / mainClass := Some("org.teckhooi.fileutils.Main"),
     nativeImageOptions ++= List(
