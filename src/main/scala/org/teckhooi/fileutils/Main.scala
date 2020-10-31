@@ -15,8 +15,11 @@ import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import org.teckhooi.fileutils.domain.{DeleteCommand, ListCommand}
 
 object Main
-    extends CommandIOApp(name = "file-utils",
-                         header = "Sums the bytes used by the files in the directory including sub-directories") {
+    extends CommandIOApp(
+      name = "file-utils",
+      header = "Sums the bytes used by all the files in the given directory including sub-directories",
+      version = s"${BuildInfo.version}${BuildInfo.gitHeadCommit.fold("")(commit => s" (${commit.substring(0, 7)})")}"
+    ) {
   override def main: Opts[IO[ExitCode]] = {
     val argOpts: Opts[String] = Opts.argument[String]("paths")
 

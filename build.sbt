@@ -31,6 +31,7 @@ lazy val root = (project in file("."))
   .enablePlugins(GitVersioning, BuildInfoPlugin, NativeImagePlugin)
   .settings(
     name := "file-utils",
+    version := "1.0.0-SNAPSHOT",
     organization := "org.teckhooi",
     scalaVersion := "2.13.3",
     fork in Test := true,
