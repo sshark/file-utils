@@ -32,7 +32,7 @@ object Main
     val rmOpts: Opts[DeleteCommand] =
       Opts.subcommand(
         "rm",
-        "Remove files and sub-directories in the directory according to the patterns ** NOT IMPLEMENTED **")(
+        "Remove files and sub-directories in the directory according to the patterns ** NO ACTION WILL BE TAKEN **")(
         (argOpts, patternOpts).mapN(DeleteCommand.apply))
 
     import cats.effect.Console.implicits._
@@ -40,28 +40,45 @@ object Main
     (verboseOpts, listOpts orElse rmOpts).mapN {
       case (verbose, ListCommand(dir)) =>
         for {
-          rootDir <- IO(new File(dir))
-          exitCode <- IO(rootDir.exists()).flatMap(
-            exists =>
-              if (exists) calculateDirSize[IO](rootDir, verbose).as(ExitCode.Success)
-              else putError(s"$rootDir does not exists").as(ExitCode.Error))
+          rootDirOpt <- dirExists[IO](dir)
+          exitCode <- rootDirOpt.fold(putError(dirDoesNotExist(dir)).as(ExitCode.Error))(rootDirFile =>
+            calculateDirSize[IO](rootDirFile, verbose).as(ExitCode.Success))
         } yield exitCode
+
       case (verbose, DeleteCommand(dir, patterns)) =>
-        putStrLn(s"""Deleting files in "$dir"${showIfNotEmptyList(patterns)}""").as(ExitCode.Success)
+        for {
+          rootDir <- dirExists[IO](dir)
+          exitCode <- rootDir.fold(putError(dirDoesNotExist(dir)).as(ExitCode.Error))(rootDirFile =>
+            deleteDir[IO](rootDirFile, verbose, patterns))
+        } yield exitCode
     }
   }
 
+  private def dirDoesNotExist(dir: String) = s"""Directory "$dir" does not exist"""
+
   private def showIfNotEmptyList(xs: List[String]): String = if (xs.isEmpty) "" else s" matching ${xs.mkString(", ")}"
+
+  def dirExists[F[_]: Sync](dir: String): F[Option[File]] =
+    for {
+      rootDir <- Sync[F].delay(new File(dir))
+      exists  <- Sync[F].delay(rootDir.exists())
+    } yield Option.when(exists)(rootDir)
+
+  def deleteDir[F[_]: Sync: Parallel: Console](dir: File, verbose: Boolean, patterns: List[String]): F[ExitCode] =
+    Console[F]
+      .putStrLn(
+        s"""Deleting files in "${dir.getCanonicalPath}"${showIfNotEmptyList(patterns)} ** FAKE, NO ACTION WILL BE TAKEN **""")
+      .as(ExitCode.Success)
 
   def calculateDirSize[F[_]: Sync: Parallel: Console](dir: File, verbose: Boolean): F[Unit] =
     for {
       total <- ls[F](dir, verbose)
-      _     <- Console[F].putStrLn(s"Total $dir size is ${prettyPrint(total)} bytes")
+      _     <- Console[F].putStrLn(s"Total files size for ${dir.getCanonicalPath} is ${prettyPrint(total)} bytes")
     } yield ()
 
   private def prettyPrint(i: Long): String = java.text.NumberFormat.getIntegerInstance.format(i)
 
-  def ls[F[_]: Sync: Parallel](dir: File, verbose: Boolean): F[Long] =
+  private def ls[F[_]: Sync: Parallel](dir: File, verbose: Boolean): F[Long] =
     for {
       _ <- if (verbose)
         Sync[F].delay(
@@ -72,11 +89,11 @@ object Main
       else Sync[F].unit
       logger               <- Slf4jLogger.create[F]
       (totalSize, subDirs) <- findDirsAndSize(dir)
-      _                    <- logger.debug(s"${dir.getAbsolutePath} => ${prettyPrint(totalSize)} bytes")
+      _                    <- logger.debug(s"${dir.getCanonicalPath} => ${prettyPrint(totalSize)} bytes")
       sum                  <- subDirs.parTraverse(oneDir => ls(oneDir, verbose)).map(_.sum + totalSize)
     } yield sum
 
-  def findDirsAndSize[F[_]: Sync](baseDir: File): F[(Long, List[File])] =
+  private def findDirsAndSize[F[_]: Sync](baseDir: File): F[(Long, List[File])] =
     Sync[F].delay(
       Option(baseDir.listFiles())
         .map { xs =>

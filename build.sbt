@@ -41,8 +41,7 @@ lazy val root = (project in file("."))
       "io.chrisdavenport" %% "log4cats-slf4j" % "1.1.1",
       "ch.qos.logback"    % "logback-classic" % "1.3.0-alpha5",
       "dev.profunktor"    %% "console4cats"   % "0.8.1",
-      "com.monovore"      %% "decline-effect" % "1.3.0",
-      "com.lihaoyi"       %% "os-lib"         % "0.7.1"
+      "com.monovore"      %% "decline-effect" % "1.3.0"
     ),
     Compile / mainClass := Some("org.teckhooi.fileutils.Main"),
     nativeImageOptions ++= List(
