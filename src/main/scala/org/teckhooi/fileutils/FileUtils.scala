@@ -8,8 +8,6 @@ import cats.implicits._
 import ch.qos.logback.classic.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 
-import concurrent.ExecutionContext.global
-
 trait FileUtils[F[_]] {
   def ls(rootDir: String, verbose: Boolean = false): F[Long]
   def rm[A](rootDir: String, patterns: List[String], verbose: Boolean = false): F[Boolean]
@@ -19,8 +17,7 @@ object FileUtils {
   def apply[F[_]](implicit F: FileUtils[F]): FileUtils[F] = F
 
   object implicits {
-    implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
-    implicit val ioFileUtils: FileUtils[IO] = new FileUtilsImpl[IO]
+    implicit def ioFileUtils(implicit cs: ContextShift[IO]): FileUtils[IO] = new FileUtilsImpl[IO]
   }
 }
 
