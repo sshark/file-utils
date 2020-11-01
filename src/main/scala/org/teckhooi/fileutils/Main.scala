@@ -4,15 +4,14 @@ package fileutils
 
 import java.io.File
 
-import cats.Parallel
+import cats.{Monad, Parallel}
 import cats.effect.Console.io._
 import cats.effect.{Console, ExitCode, IO, Sync}
 import cats.implicits._
-import ch.qos.logback.classic.Logger
 import com.monovore.decline.Opts
 import com.monovore.decline.effect.CommandIOApp
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import org.teckhooi.fileutils.domain.{DeleteCommand, ListCommand}
+import org.teckhooi.fileutils.FileUtils.implicits._
 
 object Main
     extends CommandIOApp(
@@ -59,50 +58,29 @@ object Main
 
   private def dirDoesNotExist(dir: String) = s"""Directory "$dir" does not exist"""
 
-  private def showIfNotEmptyList(xs: List[String]): String = if (xs.isEmpty) "" else s" matching ${xs.mkString(", ")}"
-
-  def dirExists[F[_]: Sync](dir: String): F[Option[File]] =
+  def dirExists[F[_]: Sync](dir: String): F[Option[String]] =
     for {
       rootDir <- Sync[F].delay(new File(dir))
       exists  <- Sync[F].delay(rootDir.exists())
-    } yield Option.when(exists)(rootDir)
+    } yield Option.when(exists)(dir)
 
-  def deleteDir[F[_]: Sync: Parallel: Console](dir: File, verbose: Boolean, patterns: List[String]): F[ExitCode] =
-    Console[F]
-      .putStrLn(
-        s"""Deleting files in "${dir.getCanonicalPath}"${showIfNotEmptyList(patterns)} ** FAKE, NO ACTION WILL BE TAKEN **""")
-      .as(ExitCode.Success)
-
-  def calculateDirSize[F[_]: Sync: Parallel: Console](dir: File, verbose: Boolean): F[Unit] =
+  def deleteDir[F[_]: FileUtils: Parallel: Console: Monad](dir: String,
+                                                    verbose: Boolean,
+                                                    patterns: List[String]): F[ExitCode] =
     for {
-      total <- ls[F](dir, verbose)
-      _     <- Console[F].putStrLn(s"Total files size for ${dir.getCanonicalPath} is ${prettyPrint(total)} bytes")
+      _ <- FileUtils[F].rm(dir, patterns)
+      exitCode <- Console[F]
+        .putStrLn(
+          s"""Deleting files in "${new File(dir).getCanonicalPath}"${showIfNotEmptyList(patterns)} ** FAKE, NO ACTION WILL BE TAKEN **""")
+        .as(ExitCode.Success)
+    } yield exitCode
+
+  private def showIfNotEmptyList(xs: List[String]): String =
+    if (xs.isEmpty) "" else s" matching ${xs.mkString(", ")}"
+
+  def calculateDirSize[F[_]: Monad: FileUtils: Parallel: Console](dir: String, verbose: Boolean): F[Unit] =
+    for {
+      total     <- FileUtils[F].ls(dir, verbose)
+      _         <- Console[F].putStrLn(s"Total files size for ${new File(dir).getCanonicalPath} is ${prettyPrint(total)} bytes")
     } yield ()
-
-  private def prettyPrint(i: Long): String = java.text.NumberFormat.getIntegerInstance.format(i)
-
-  private def ls[F[_]: Sync: Parallel](dir: File, verbose: Boolean): F[Long] =
-    for {
-      _ <- if (verbose)
-        Sync[F].delay(
-          org.slf4j.LoggerFactory
-            .getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)
-            .asInstanceOf[Logger]
-            .setLevel(ch.qos.logback.classic.Level.DEBUG))
-      else Sync[F].unit
-      logger               <- Slf4jLogger.create[F]
-      (totalSize, subDirs) <- findDirsAndSize(dir)
-      _                    <- logger.debug(s"${dir.getCanonicalPath} => ${prettyPrint(totalSize)} bytes")
-      sum                  <- subDirs.parTraverse(oneDir => ls(oneDir, verbose)).map(_.sum + totalSize)
-    } yield sum
-
-  private def findDirsAndSize[F[_]: Sync](baseDir: File): F[(Long, List[File])] =
-    Sync[F].delay(
-      Option(baseDir.listFiles())
-        .map { xs =>
-          xs.map(f => if (f.isFile) f.length.asLeft[File] else f.asRight[Long]).foldLeft((0L, List.empty[File])) {
-            case ((fs, xs), x) => x.fold(newLen => (newLen + fs, xs), newFile => (fs, newFile :: xs))
-          }
-        }
-        .getOrElse((0, Nil)))
 }
