@@ -1,6 +1,6 @@
 # file-utils
 
-*file-utils* is a project to demonstrate the building a native application using functional Scala code (consists of pure functions only) using GraavlVM `native-image`. Side effects are contained and pushed to the fringe of the application where they will be executed at the *end of the world*.
+*file-utils* is a project to demonstrate how to a native application using functional Scala code, adhering to *Tagless Final* pattern, using GraavlVM `native-image`. Side effects are contained and pushed to the fringe of the application where they will be executed at the *end of the world*.
 
 The purpose of this application is to calculate the disk space occupied by the files for the given top directory.
 

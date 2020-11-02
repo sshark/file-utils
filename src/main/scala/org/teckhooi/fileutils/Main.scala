@@ -6,7 +6,7 @@ import java.io.File
 
 import cats.Monad
 import cats.effect.Console.io._
-import cats.effect.{Console, ExitCode, IO, Sync}
+import cats.effect.{Console, ExitCode, IO}
 import cats.implicits._
 import com.monovore.decline.Opts
 import com.monovore.decline.effect.CommandIOApp
@@ -42,14 +42,14 @@ object Main
     (verboseOpts, listOpts orElse rmOpts).mapN {
       case (verbose, ListCommand(dir)) =>
         for {
-          rootDirOpt <- dirExists[IO](dir)
+          rootDirOpt <- FileUtils[IO].dirExists(dir)
           exitCode <- rootDirOpt.fold(putError(dirDoesNotExist(dir)).as(ExitCode.Error))(rootDirFile =>
             calculateDirSize[IO](rootDirFile, verbose).as(ExitCode.Success))
         } yield exitCode
 
       case (verbose, DeleteCommand(dir, patterns)) =>
         for {
-          rootDir <- dirExists[IO](dir)
+          rootDir <- FileUtils[IO].dirExists(dir)
           exitCode <- rootDir.fold(putError(dirDoesNotExist(dir)).as(ExitCode.Error))(rootDirFile =>
             deleteDir[IO](rootDirFile, patterns))
         } yield exitCode
@@ -57,12 +57,6 @@ object Main
   }
 
   private def dirDoesNotExist(dir: String) = s"""Directory "$dir" does not exist"""
-
-  def dirExists[F[_]: Sync](dir: String): F[Option[String]] =
-    for {
-      rootDir <- Sync[F].delay(new File(dir))
-      exists  <- Sync[F].delay(rootDir.exists())
-    } yield Option.when(exists)(dir)
 
   def deleteDir[F[_]: FileUtils: Console: Monad](dir: String, patterns: List[String]): F[ExitCode] =
     for {

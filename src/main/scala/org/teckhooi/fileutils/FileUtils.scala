@@ -11,6 +11,7 @@ import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 trait FileUtils[F[_]] {
   def ls(rootDir: String, verbose: Boolean = false): F[Long]
   def rm[A](rootDir: String, patterns: List[String], verbose: Boolean = false): F[Boolean]
+  def dirExists(dir: String): F[Option[String]]
 }
 
 object FileUtils {
@@ -22,6 +23,12 @@ object FileUtils {
 }
 
 class FileUtilsImpl[F[_]: Sync: Parallel] extends FileUtils[F] {
+  override def dirExists(dir: String): F[Option[String]] =
+    for {
+      rootDir <- Sync[F].delay(new File(dir))
+      exists  <- Sync[F].delay(rootDir.exists())
+    } yield Option.when(exists)(dir)
+
   override def ls(rootDir: String, verbose: Boolean): F[Long] =
     for {
       _ <- if (verbose)
