@@ -1,5 +1,5 @@
 import java.io.File
-import java.nio.file.{Files, StandardCopyOption, Paths}
+import java.nio.file.{Files, StandardCopyOption}
 
 import sbt.TupleSyntax.t2ToTable2
 
@@ -24,7 +24,7 @@ copyNativeImageConfigs := ((baseDirectory, target) map { (base, trg) =>
   }
 }).value
 
-addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.11.0" cross CrossVersion.full)
+addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.11.1" cross CrossVersion.full)
 addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1")
 
 lazy val root = (project in file("."))
@@ -33,7 +33,7 @@ lazy val root = (project in file("."))
     name := "file-utils",
     version := "1.0.0-SNAPSHOT",
     organization := "org.teckhooi",
-    scalaVersion := "2.13.3",
+    scalaVersion := "2.13.4",
     fork in Test := true,
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, git.baseVersion, git.gitHeadCommit),
     buildInfoPackage := "org.teckhooi.fileutils",
@@ -44,12 +44,12 @@ lazy val root = (project in file("."))
       "dev.profunktor"    %% "console4cats"   % "0.8.1",
       "com.monovore"      %% "decline-effect" % "1.3.0"
     ),
-    Compile / mainClass := Some("org.teckhooi.fileutils.Main"),
+    Compile / mainClass := Some("org.teckhooi.fileutils.FileUtilsApp"),
     nativeImageOptions ++= List(
       "--no-fallback",
       "-H:+AddAllCharsets",
       "-H:ReflectionConfigurationFiles=META-INF/native-image/reflect-config.json",
       "-H:IncludeResources=logback.xml"
     ),
-    nativeImage := (nativeImage dependsOn copyNativeImageConfigs).value
+    nativeImage := (nativeImage dependsOn copyNativeImageConfigs).value,
   )
