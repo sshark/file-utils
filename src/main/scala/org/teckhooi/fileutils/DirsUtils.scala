@@ -8,28 +8,28 @@ import cats.implicits._
 import ch.qos.logback.classic.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 
-trait FileUtils[F[_]] {
-  def ls(rootDir: String, verbose: Boolean = false): F[Long]
+trait DirsUtils[F[_]] {
+  def dirSize(rootDir: String, verbose: Boolean = false): F[Long]
   def rm[A](rootDir: String, patterns: List[String], verbose: Boolean = false): F[Boolean]
   def dirExists(dir: String): F[Option[String]]
 }
 
-object FileUtils {
-  def apply[F[_]](implicit F: FileUtils[F]): FileUtils[F] = F
+object DirsUtils {
+  def apply[F[_]](implicit F: DirsUtils[F]): DirsUtils[F] = F
 
   object implicits {
-    implicit def ioFileUtils(implicit cs: ContextShift[IO]): FileUtils[IO] = new FileUtilsImpl[IO]
+    implicit def ioDirsUtils(implicit cs: ContextShift[IO]): DirsUtils[IO] = new DefaultDirsUtils[IO]
   }
 }
 
-class FileUtilsImpl[F[_]: Sync: Parallel] extends FileUtils[F] {
+class DefaultDirsUtils[F[_]: Sync: Parallel] extends DirsUtils[F] {
   override def dirExists(dir: String): F[Option[String]] =
     for {
       rootDir <- Sync[F].delay(new File(dir))
       exists  <- Sync[F].delay(rootDir.exists())
     } yield Option.when(exists)(dir)
 
-  override def ls(rootDir: String, verbose: Boolean): F[Long] =
+  override def dirSize(rootDir: String, verbose: Boolean): F[Long] =
     for {
       _ <- if (verbose)
         Sync[F].delay(
@@ -42,7 +42,7 @@ class FileUtilsImpl[F[_]: Sync: Parallel] extends FileUtils[F] {
       dir                  <- Sync[F].delay(new File(rootDir))
       (totalSize, subDirs) <- findDirsAndSize(dir)
       _                    <- logger.debug(s"${dir.getCanonicalPath} => ${prettyPrint(totalSize)} bytes")
-      sum                  <- subDirs.parTraverse(oneDir => ls(oneDir.getCanonicalPath)).map(_.sum + totalSize)
+      sum                  <- subDirs.parTraverse(oneDir => dirSize(oneDir.getCanonicalPath)).map(_.sum + totalSize)
     } yield sum
 
   private def findDirsAndSize(baseDir: File): F[(Long, List[File])] =

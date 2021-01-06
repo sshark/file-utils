@@ -44,7 +44,7 @@ lazy val root = (project in file("."))
       "dev.profunktor"    %% "console4cats"   % "0.8.1",
       "com.monovore"      %% "decline-effect" % "1.3.0"
     ),
-    Compile / mainClass := Some("org.teckhooi.fileutils.FileUtilsApp"),
+    Compile / mainClass := Some("org.teckhooi.fileutils.MainApp"),
     nativeImageOptions ++= List(
       "--no-fallback",
       "-H:+AddAllCharsets",
