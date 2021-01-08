@@ -18,11 +18,13 @@ object DirsUtils {
   def apply[F[_]](implicit F: DirsUtils[F]): DirsUtils[F] = F
 
   object implicits {
+    import FilesUtils.implicits._
+
     implicit def ioDirsUtils(implicit cs: ContextShift[IO]): DirsUtils[IO] = new DefaultDirsUtils[IO]
   }
 }
 
-class DefaultDirsUtils[F[_]: Sync: Parallel] extends DirsUtils[F] {
+class DefaultDirsUtils[F[_]: Sync: Parallel: FilesUtils] extends DirsUtils[F] {
   override def dirExists(dir: String): F[Option[String]] =
     for {
       rootDir <- Sync[F].delay(new File(dir))
@@ -39,9 +41,9 @@ class DefaultDirsUtils[F[_]: Sync: Parallel] extends DirsUtils[F] {
             .setLevel(ch.qos.logback.classic.Level.DEBUG))
       else Sync[F].unit
       logger               <- Slf4jLogger.create[F]
-      dir                  <- Sync[F].delay(new File(rootDir))
-      (totalSize, subDirs) <- findDirsAndSize(dir)
-      _                    <- logger.debug(s"${dir.getCanonicalPath} => ${prettyPrint(totalSize)} bytes")
+      (totalSize, subDirs) <- Sync[F].delay(new File(rootDir)).flatMap(findDirsAndSize)
+      fullPath             <- FilesUtils[F].fullPath(rootDir)
+      _                    <- logger.debug(s"$fullPath => ${prettyPrint(totalSize)} bytes")
       sum                  <- subDirs.parTraverse(oneDir => dirSize(oneDir.getCanonicalPath)).map(_.sum + totalSize)
     } yield sum
 

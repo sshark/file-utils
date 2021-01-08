@@ -24,8 +24,9 @@ object MainApp
     import org.teckhooi.fileutils.FilesUtils.implicits._
 
     val versionAction: Opts[IO[ExitCode]] =
-      Opts.flag("version", help = "Show the application version number", visibility = Visibility.Partial).as(
-        Console[IO]
+      Opts
+        .flag("version", help = "Show the application version number", visibility = Visibility.Partial)
+        .as(Console[IO]
           .putStr(s"${BuildInfo.version}${BuildInfo.gitHeadCommit.fold("")(commit => s" (${commit.substring(0, 7)})")}")
           .as(ExitCode.Success))
 
@@ -66,7 +67,7 @@ object MainApp
   def deleteDir[F[_]: DirsUtils: FilesUtils: Console: Monad](dir: String, patterns: List[String]): F[ExitCode] =
     for {
       fullPath <- FilesUtils[F].fullPath(dir)
-      _ <- DirsUtils[F].rm(dir, patterns)
+      _        <- DirsUtils[F].rm(dir, patterns)
       exitCode <- Console[F]
         .putStrLn(
           s"""Deleting files in "$fullPath"${showIfNotEmptyList(patterns)} ** FAKE, NO ACTION WILL BE TAKEN **""")
@@ -79,7 +80,7 @@ object MainApp
   def calculateDirSize[F[_]: Monad: DirsUtils: FilesUtils: Console](dir: String, verbose: Boolean): F[Unit] =
     for {
       fullPath <- FilesUtils[F].fullPath(dir)
-      total <- DirsUtils[F].dirSize(dir, verbose)
-      _     <- Console[F].putStrLn(s"Total files size for $fullPath is ${prettyPrint(total)} bytes")
+      total    <- DirsUtils[F].dirSize(dir, verbose)
+      _        <- Console[F].putStrLn(s"Total files size for $fullPath is ${prettyPrint(total)} bytes")
     } yield ()
 }

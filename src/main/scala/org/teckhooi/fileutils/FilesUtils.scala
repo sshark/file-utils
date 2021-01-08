@@ -10,7 +10,7 @@ trait FilesUtils[F[_]] {
 }
 
 object FilesUtils {
-  def apply[F[_] : FilesUtils]: FilesUtils[F] = implicitly[FilesUtils[F]]
+  def apply[F[_]: FilesUtils]: FilesUtils[F] = implicitly[FilesUtils[F]]
 
   object implicits {
     implicit def ioFilesUtils: DefaultFilesUtils[IO] = new DefaultFilesUtils[IO]
@@ -18,6 +18,6 @@ object FilesUtils {
 }
 
 class DefaultFilesUtils[F[_]: Sync] extends FilesUtils[F] {
-  override def size(filename: String): F[Long] = Sync[F].delay(Files.size(Path.of(filename)))
+  override def size(filename: String): F[Long]       = Sync[F].delay(Files.size(Path.of(filename)))
   override def fullPath(filename: String): F[String] = Sync[F].delay(Path.of(filename).toFile.getAbsolutePath)
 }
