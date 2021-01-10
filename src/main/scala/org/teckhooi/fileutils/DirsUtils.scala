@@ -1,12 +1,12 @@
 package org.teckhooi.fileutils
 
-import java.io.File
-
 import cats.Parallel
 import cats.effect.{ContextShift, IO, Sync}
 import cats.implicits._
 import ch.qos.logback.classic.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+
+import java.io.File
 
 trait DirsUtils[F[_]] {
   def dirSize(rootDir: String, verbose: Boolean = false): F[Long]
@@ -14,24 +14,29 @@ trait DirsUtils[F[_]] {
   def dirExists(dir: String): F[Option[String]]
 }
 
-object DirsUtils {
-  def apply[F[_]](implicit F: DirsUtils[F]): DirsUtils[F] = F
+trait DirsUtilsSyncRequired[F[_]] {
+  def dirSize(path: File, verbose: Boolean = false): F[Long]
+  def rm[A](path: File, patterns: List[String], verbose: Boolean = false): F[Boolean]
+  def dirExists(path: File): F[Option[File]]
+}
+
+object DirsUtilsSyncRequired {
+  def apply[F[_]](implicit F: DirsUtilsSyncRequired[F]): DirsUtilsSyncRequired[F] = F
 
   object implicits {
-    import FilesUtils.implicits._
+    import FilesUtilsSyncRequired.implicits._
 
-    implicit def ioDirsUtils(implicit cs: ContextShift[IO]): DirsUtils[IO] = new DefaultDirsUtils[IO]
+    implicit def ioDirsUtils(implicit cs: ContextShift[IO]): DirsUtilsSyncRequired[IO] = new SyncDirsUtils[IO]
   }
 }
 
-class DefaultDirsUtils[F[_]: Sync: Parallel: FilesUtils] extends DirsUtils[F] {
-  override def dirExists(dir: String): F[Option[String]] =
+class SyncDirsUtils[F[_]: Sync: Parallel: FilesUtilsSyncRequired] extends DirsUtilsSyncRequired[F] {
+  override def dirExists(path: File): F[Option[File]] =
     for {
-      rootDir <- Sync[F].delay(new File(dir))
-      exists  <- Sync[F].delay(rootDir.exists())
-    } yield Option.when(exists)(dir)
+      exists  <- Sync[F].delay(path.exists())
+    } yield Option.when(exists)(path)
 
-  override def dirSize(rootDir: String, verbose: Boolean): F[Long] =
+  override def dirSize(path: File, verbose: Boolean): F[Long] =
     for {
       _ <- if (verbose)
         Sync[F].delay(
@@ -41,10 +46,10 @@ class DefaultDirsUtils[F[_]: Sync: Parallel: FilesUtils] extends DirsUtils[F] {
             .setLevel(ch.qos.logback.classic.Level.DEBUG))
       else Sync[F].unit
       logger               <- Slf4jLogger.create[F]
-      (totalSize, subDirs) <- Sync[F].delay(new File(rootDir)).flatMap(findDirsAndSize)
-      fullPath             <- FilesUtils[F].fullPath(rootDir)
+      (totalSize, subDirs) <- findDirsAndSize(path)
+      fullPath             <- FilesUtilsSyncRequired[F].fullPath(path)
       _                    <- logger.debug(s"$fullPath => ${prettyPrint(totalSize)} bytes")
-      sum                  <- subDirs.parTraverse(oneDir => dirSize(oneDir.getCanonicalPath)).map(_.sum + totalSize)
+      sum                  <- subDirs.parTraverse(oneDir => dirSize(oneDir)).map(_.sum + totalSize)
     } yield sum
 
   private def findDirsAndSize(baseDir: File): F[(Long, List[File])] =
@@ -57,5 +62,5 @@ class DefaultDirsUtils[F[_]: Sync: Parallel: FilesUtils] extends DirsUtils[F] {
         }
         .getOrElse((0, Nil)))
 
-  override def rm[A](rootDir: String, patterns: List[String], verbose: Boolean): F[Boolean] = Sync[F].pure(true)
+  override def rm[A](rootDir: File, patterns: List[String], verbose: Boolean): F[Boolean] = Sync[F].pure(true)
 }

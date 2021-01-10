@@ -2,6 +2,7 @@ package org.teckhooi.fileutils
 
 import cats.effect.{IO, Sync}
 
+import java.io.File
 import java.nio.file.{Files, Path}
 
 trait FilesUtils[F[_]] {
@@ -9,15 +10,20 @@ trait FilesUtils[F[_]] {
   def fullPath(filename: String): F[String]
 }
 
-object FilesUtils {
-  def apply[F[_]: FilesUtils]: FilesUtils[F] = implicitly[FilesUtils[F]]
+trait FilesUtilsSyncRequired[F[_]] {
+  def size(path: Path): F[Long]
+  def fullPath(filename: File): F[String]
+}
+
+object FilesUtilsSyncRequired {
+  def apply[F[_]: FilesUtilsSyncRequired]: FilesUtilsSyncRequired[F] = implicitly[FilesUtilsSyncRequired[F]]
 
   object implicits {
-    implicit def ioFilesUtils: DefaultFilesUtils[IO] = new DefaultFilesUtils[IO]
+    implicit def ioFilesUtils: FilesUtilsSyncRequired[IO] = new SyncFilesUtils[IO]
   }
 }
 
-class DefaultFilesUtils[F[_]: Sync] extends FilesUtils[F] {
-  override def size(filename: String): F[Long]       = Sync[F].delay(Files.size(Path.of(filename)))
-  override def fullPath(filename: String): F[String] = Sync[F].delay(Path.of(filename).toFile.getAbsolutePath)
+class SyncFilesUtils[F[_]: Sync] extends FilesUtilsSyncRequired[F] {
+  override def size(path: Path): F[Long]       = Sync[F].delay(Files.size(path))
+  override def fullPath(file: File): F[String] = Sync[F].delay(file.getAbsolutePath)
 }

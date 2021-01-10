@@ -11,17 +11,19 @@ import com.monovore.decline.{Opts, Visibility}
 import com.monovore.decline.effect.CommandIOApp
 import org.teckhooi.fileutils.domain.{DeleteCommand, ListCommand}
 
+import java.nio.file.Path
+
 object MainApp
     extends CommandIOApp(
       name = "file-utils",
       header = "Sums the bytes used by all the files in the given directory including sub-directories"
     ) {
   override def main: Opts[IO[ExitCode]] = {
-    val argOpts: Opts[String] = Opts.argument[String]("paths")
+    val argOpts: Opts[Path] = Opts.argument[Path]("paths")
 
     import cats.effect.Console.implicits._
-    import org.teckhooi.fileutils.DirsUtils.implicits._
-    import org.teckhooi.fileutils.FilesUtils.implicits._
+    import org.teckhooi.fileutils.DirsUtilsSyncRequired.implicits._
+    import org.teckhooi.fileutils.FilesUtilsSyncRequired.implicits._
 
     val versionAction: Opts[IO[ExitCode]] =
       Opts
@@ -48,15 +50,15 @@ object MainApp
     versionAction orElse (verboseOpts, listOpts orElse rmOpts).mapN {
       case (verbose, ListCommand(dir)) =>
         for {
-          rootDirOpt <- DirsUtils[IO].dirExists(dir)
-          exitCode <- rootDirOpt.fold(putError(dirDoesNotExist(dir)).as(ExitCode.Error))(rootDirFile =>
+          rootDirOpt <- DirsUtilsSyncRequired[IO].dirExists(dir.toFile)
+          exitCode <- rootDirOpt.fold(putError(dirDoesNotExist(dir.toFile.getName)).as(ExitCode.Error))(rootDirFile =>
             calculateDirSize[IO](rootDirFile, verbose).as(ExitCode.Success))
         } yield exitCode
 
       case (_, DeleteCommand(dir, patterns)) =>
         for {
-          rootDir <- DirsUtils[IO].dirExists(dir)
-          exitCode <- rootDir.fold(putError(dirDoesNotExist(dir)).as(ExitCode.Error))(rootDirFile =>
+          rootDir <- DirsUtilsSyncRequired[IO].dirExists(dir.toFile)
+          exitCode <- rootDir.fold(putError(dirDoesNotExist(dir.toFile.getName)).as(ExitCode.Error))(rootDirFile =>
             deleteDir[IO](rootDirFile, patterns))
         } yield exitCode
     }
@@ -64,10 +66,12 @@ object MainApp
 
   private def dirDoesNotExist(dir: String) = s"""Directory "$dir" does not exist"""
 
-  def deleteDir[F[_]: DirsUtils: FilesUtils: Console: Monad](dir: String, patterns: List[String]): F[ExitCode] =
+  def deleteDir[F[_]: DirsUtilsSyncRequired: FilesUtilsSyncRequired: Console: Monad](
+      dir: File,
+      patterns: List[String]): F[ExitCode] =
     for {
-      fullPath <- FilesUtils[F].fullPath(dir)
-      _        <- DirsUtils[F].rm(dir, patterns)
+      fullPath <- FilesUtilsSyncRequired[F].fullPath(dir)
+      _        <- DirsUtilsSyncRequired[F].rm(dir, patterns)
       exitCode <- Console[F]
         .putStrLn(
           s"""Deleting files in "$fullPath"${showIfNotEmptyList(patterns)} ** FAKE, NO ACTION WILL BE TAKEN **""")
@@ -77,10 +81,11 @@ object MainApp
   private def showIfNotEmptyList(xs: List[String]): String =
     if (xs.isEmpty) "" else s" matching ${xs.mkString(", ")}"
 
-  def calculateDirSize[F[_]: Monad: DirsUtils: FilesUtils: Console](dir: String, verbose: Boolean): F[Unit] =
+  def calculateDirSize[F[_]: Monad: DirsUtilsSyncRequired: FilesUtilsSyncRequired: Console](dir: File,
+                                                                                            verbose: Boolean): F[Unit] =
     for {
-      fullPath <- FilesUtils[F].fullPath(dir)
-      total    <- DirsUtils[F].dirSize(dir, verbose)
+      fullPath <- FilesUtilsSyncRequired[F].fullPath(dir)
+      total    <- DirsUtilsSyncRequired[F].dirSize(dir, verbose)
       _        <- Console[F].putStrLn(s"Total files size for $fullPath is ${prettyPrint(total)} bytes")
     } yield ()
 }
